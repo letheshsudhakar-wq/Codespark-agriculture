@@ -15,8 +15,6 @@ Nothing is imputed. A soil value without method/basis is refused, not guessed.
 """
 import json
 
-F_P = 141.94 / 61.95   # P -> P2O5   (2.2914)
-F_K = 94.20 / 78.20    # K -> K2O    (1.2046)
 
 # rates: (N, P2O5, K2O) kg/ha.  Source ids refer to karnataka_fertilizer_recommendations.csv
 POP = {
@@ -28,16 +26,6 @@ POP = {
 }
 ALIASES = {"rice": "paddy", "finger millet": "ragi", "nachni": "ragi", "corn": "maize"}
 
-PRIMARY = {"n": (280, 560), "p2o5": (22.9, 56.0), "k2o": (141, 336), "oc": (0.5, 0.75)}
-ALTS = {  # alternative published tables, converted to the same basis, for boundary sensitivity
-    "TNAU": {"n": (240, 480), "p2o5": (11 * F_P, 22 * F_P), "k2o": (110 * F_K, 280 * F_K)},
-    "AP-J-Agril-Sci-2017": {"n": (280, 560), "p2o5": (11 * F_P, 25.6 * F_P), "k2o": (120 * F_K, 280 * F_K)},
-}
-
-def _cls(v, lo_hi):
-    lo, hi = lo_hi
-    return "low" if v < lo else ("medium" if v <= hi else "high")
-
 def _soil_status(inp):
     out, missing, notes = {}, [], []
     # ---- nitrogen
@@ -45,60 +33,131 @@ def _soil_status(inp):
         if str(inp.get("avail_n_method", "")).lower() not in ("kmno4", "alkaline_kmno4", "alkaline permanganate"):
             notes.append("Nitrogen refused: method must be alkaline KMnO4 (available N). A value without method cannot be treated as available N.")
         else:
-            v = float(inp["avail_n_kg_ha"])
-            c = _cls(v, PRIMARY["n"])
-            sens = sorted({k for k, t in ALTS.items() if _cls(v, t["n"]) != c})
-            out["nitrogen"] = dict(value=v, unit="kg N/ha (KMnO4)", status=c, threshold_source="UAS-B/Karnataka 280-560", sensitive_to=sens)
+            out["nitrogen"] = dict(
+                value=float(inp["avail_n_kg_ha"]),
+                unit="kg N/ha",
+                method="Alkaline KMnO4",
+                interpretation="Measurement only; no verified status classification."
+            )
     else:
         missing.append(("available nitrogen (alkaline KMnO4, kg/ha)", "Soil N supply decides whether the generic N rate should be adjusted."))
     # ---- phosphorus
     if inp.get("p_value") is not None:
-        basis, meth = str(inp.get("p_basis", "")).upper(), str(inp.get("p_method", "")).lower()
+        basis = str(inp.get("p_basis", "")).upper()
+        meth = str(inp.get("p_method", "")).lower()
+
         if basis not in ("P", "P2O5") or meth not in ("olsen", "bray1", "bray-1"):
-            notes.append("Phosphorus refused: need basis (P or P2O5) and method (Olsen or Bray-1).")
+            notes.append("Phosphorus refused: provide basis (P or P2O5) and method (Olsen or Bray-1).")
         else:
-            v = float(inp["p_value"]) * (F_P if basis == "P" else 1)
-            c = _cls(v, PRIMARY["p2o5"])
-            sens = sorted({k for k, t in ALTS.items() if _cls(v, t["p2o5"]) != c})
-            if meth == "olsen" and inp.get("soil_ph") is not None and float(inp["soil_ph"]) < 5.5:
-                notes.append("Olsen P is intended for neutral/alkaline soils; pH < 5.5 usually calls for Bray-1. Interpret with care.")
-            out["phosphorus"] = dict(value=round(v, 2), unit="kg P2O5/ha (converted)" if basis == "P" else "kg P2O5/ha", status=c,
-                                     threshold_source="UAS-B/Karnataka 22.9-56.0 as P2O5", sensitive_to=sens)
+            notes.append(
+                f"Phosphorus measurement received: {inp['p_value']} ({basis}), "
+                f"method {meth}. Original unit was not supplied; no conversion or classification performed."
+            )
+            if meth == "olsen" and inp.get("soil_ph") is not None:
+                try:
+                    if float(inp["soil_ph"]) < 5.5:
+                        notes.append("Olsen P interpretation requires caution for acidic soil; consult the soil testing laboratory.")
+                except (ValueError, TypeError):
+                    notes.append("Invalid soil pH; Olsen P interpretation skipped.")
     else:
-        missing.append(("available phosphorus (Olsen or Bray-1; state whether as P or P2O5)", "Controls whether the P2O5 rate is kept, raised or reduced."))
+        missing.append(("available phosphorus (Olsen or Bray-1; state P or P2O5)", "Required for phosphorus assessment."))
+
     # ---- potassium
     if inp.get("k_value") is not None:
-        basis, meth = str(inp.get("k_basis", "")).upper(), str(inp.get("k_method", "")).lower()
+        basis = str(inp.get("k_basis", "")).upper()
+        meth = str(inp.get("k_method", "")).lower()
+
         if basis not in ("K", "K2O") or meth not in ("nh4oac", "ammonium acetate"):
-            notes.append("Potassium refused: need basis (K or K2O) and method (neutral NH4OAc).")
+            notes.append("Potassium refused: provide basis (K or K2O) and neutral NH4OAc testing method.")
         else:
-            v = float(inp["k_value"]) * (F_K if basis == "K" else 1)
-            c = _cls(v, PRIMARY["k2o"])
-            sens = sorted({k for k, t in ALTS.items() if _cls(v, t["k2o"]) != c})
-            out["potassium"] = dict(value=round(v, 2), unit="kg K2O/ha", status=c, threshold_source="UAS-B/Karnataka 141-336 as K2O", sensitive_to=sens)
+            notes.append(
+                f"Potassium measurement received: {inp['k_value']} ({basis}), "
+                f"method {meth}. Original unit was not supplied; no conversion or classification performed."
+            )
     else:
-        missing.append(("available potassium (NH4OAc; state whether as K or K2O)", "Controls whether the K2O rate is kept, raised or reduced."))
-    # ---- organic carbon (organic matter is NOT accepted)
+        missing.append(("available potassium (NH4OAc; state K or K2O)", "Required for potassium assessment."))
+
+    # ---- organic carbon
     if inp.get("oc_pct") is not None:
-        out["organic_carbon"] = dict(value=float(inp["oc_pct"]), unit="% (Walkley-Black)", status=_cls(float(inp["oc_pct"]), PRIMARY["oc"]), threshold_source="0.5-0.75 %")
+        oc_method = str(inp.get("oc_method", "")).lower().replace("_", "-")
+        if oc_method not in ("walkley-black", "walkley black", "wb"):
+            notes.append("Organic carbon refused: provide a verified Walkley-Black testing method before classification.")
+        else:
+            out["organic_carbon"] = dict(
+                value=float(inp["oc_pct"]),
+                unit="%",
+                method="Walkley-Black",
+                interpretation="Measurement only; no verified status classification."
+            )
+
     if inp.get("om_pct") is not None and inp.get("oc_pct") is None:
-        notes.append("Organic matter given: not converted to organic carbon (the 1.724 factor is a convention). Provide Walkley-Black OC.")
+        notes.append("Organic matter is not converted into organic carbon. Provide a laboratory organic-carbon result.")
+
     return out, missing, notes
 
-def _products(n, p, k):
-    dap = p / 0.46
-    n_from_dap = dap * 0.18
-    urea = max(n - n_from_dap, 0) / 0.46
-    mop = k / 0.60
-    return dict(urea_kg_ha=round(urea, 1), dap_kg_ha=round(dap, 1), mop_kg_ha=round(mop, 1),
-                note="Arithmetic from nominal grades (urea 46% N; DAP 18-46-0; MOP 60% K2O); generic, not soil-test-adjusted")
+def _validate_numeric_inputs(inp):
+    import math
+
+    errors = []
+    fields = {
+        "avail_n_kg_ha": (0, None),
+        "p_value": (0, None),
+        "k_value": (0, None),
+        "oc_pct": (0, 100),
+        "om_pct": (0, 100),
+        "soil_ph": (0, 14),
+    }
+
+    for field, (minimum, maximum) in fields.items():
+        value = inp.get(field)
+
+        if value is None:
+            continue
+
+        if isinstance(value, bool):
+            errors.append(f"{field}: boolean is not a valid measurement.")
+            continue
+
+        try:
+            number = float(value)
+        except (ValueError, TypeError):
+            errors.append(f"{field}: must be numeric.")
+            continue
+
+        if not math.isfinite(number):
+            errors.append(f"{field}: must be a finite number.")
+            continue
+
+        if number < minimum or (maximum is not None and number > maximum):
+            errors.append(f"{field}: value is outside the permitted range.")
+
+    return errors
+
 
 def advise(inp):
+    inp = dict(inp)
+    r = dict(input_crop=None, tier_reached=None, outputs={}, missing_critical=[], refusals=[], messages=[])
+
+    numeric_errors = _validate_numeric_inputs(inp)
+    r["refusals"].extend(numeric_errors)
+
+    for field in ("avail_n_kg_ha", "p_value", "k_value", "oc_pct", "om_pct", "soil_ph"):
+        value = inp.get(field)
+        if value is not None:
+            try:
+                number = float(value)
+                if any(error.startswith(field + ":") for error in numeric_errors):
+                    inp[field] = None
+                else:
+                    inp[field] = number
+            except (ValueError, TypeError):
+                inp[field] = None
+
     crop = ALIASES.get(str(inp.get("crop", "")).strip().lower(), str(inp.get("crop", "")).strip().lower())
-    r = dict(input_crop=crop, tier_reached=None, outputs={}, missing_critical=[], refusals=[], messages=[])
-    if crop not in ("paddy", "maize", "ragi"):
+    r["input_crop"] = crop
+    if not crop:
         r["tier_reached"] = "TIER_0_REJECT"
-        r["messages"].append("Crop not supported (supported: paddy, maize, ragi). No recommendation produced.")
+        r["messages"].append("Please provide a crop name.")
         return r
     # ---- tier 1
     key = None
@@ -112,12 +171,18 @@ def advise(inp):
         key = ("ragi", i) if i in ("rainfed", "irrigated") else None
         if key is None:
             r["missing_critical"].append(("irrigation (rainfed or irrigated)", "Documented ragi rates differ by water regime (50:40:25 vs 100:50:50)."))
-    else:
+    elif crop == "maize":
         key = ("maize", None)
+    else:
+        key = None
+        r["missing_critical"].append((
+            "verified crop-specific recommendation",
+            f"No verified Karnataka package-of-practice record is currently available for {crop}. No fertilizer rate will be guessed."
+        ))
     if key:
         n, p, k, rid = POP[key]
         r["outputs"]["generic_package_of_practice"] = dict(N_kg_ha=n, P2O5_kg_ha=p, K2O_kg_ha=k, record=rid,
-            products=_products(n, p, k), label="GENERIC crop-level recommendation, NOT personalised to your soil")
+            label="GENERIC crop-level rate; NOT personalised to soil", farmer_use_status="SOURCE VERIFICATION REQUIRED")
         r["tier_reached"] = "TIER_1_GENERIC"
     # ---- tier 2
     status, missing, notes = _soil_status(inp)
