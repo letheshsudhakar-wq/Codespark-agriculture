@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { ArrowLeft, ArrowRight, Check, Globe } from 'lucide-react';
 
 export const LanguageSelectionScreen = () => {
-  const { language, changeLanguage, navigate, goBack, t, localize } = useApp();
+  const { language, changeLanguage, navigate, goBack, screenHistory, t, localize } = useApp();
   const [selected, setSelected] = useState(language);
 
   const languages = [
@@ -44,7 +44,12 @@ export const LanguageSelectionScreen = () => {
 
   const handleContinue = () => {
     changeLanguage(selected);
-    navigate('soil-report-choice');
+    const previousScreen = screenHistory[screenHistory.length - 2];
+    if (previousScreen && previousScreen !== 'welcome') {
+      goBack();
+    } else {
+      navigate('soil-report-choice');
+    }
   };
 
   return (

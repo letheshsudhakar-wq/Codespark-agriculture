@@ -24,7 +24,7 @@ const DEFAULT_FARM_INFO = {
   irrigation: 'canal_flood',
   previousFertilizers: 'DAP & Urea',
   organicManure: 'Yes (FYM applied before transplanting)',
-  farmingIssues: ['Minor leaf tip yellowing'],
+  farmingIssues: ['Leaf yellowing at tips'],
 };
 
 export const AppProvider = ({ children }) => {
@@ -327,6 +327,7 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider
       value={{
         currentScreen,
+        screenHistory,
         navigate,
         goBack,
         language,

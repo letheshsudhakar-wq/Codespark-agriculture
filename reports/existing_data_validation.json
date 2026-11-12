@@ -1,0 +1,54 @@
+{
+    "soil_raw": {
+        "status": "AVAILABLE",
+        "rows": 0,
+        "columns": 43,
+        "missing_cells": 0,
+        "duplicate_rows": 0,
+        "usable_soil_records": 0
+    },
+    "soil_cleaned": {
+        "status": "AVAILABLE",
+        "rows": 0,
+        "columns": 44,
+        "missing_cells": 0,
+        "duplicate_rows": 0,
+        "usable_soil_records": 0
+    },
+    "weather": {
+        "status": "AVAILABLE",
+        "rows": 365,
+        "columns": 35,
+        "missing_cells": 2200,
+        "duplicate_rows": 0,
+        "unique_coordinates": 1,
+        "date_range": [
+            "2025-01-01",
+            "2025-12-31"
+        ]
+    },
+    "fertilizer_recommendations": {
+        "status": "AVAILABLE",
+        "rows": 8,
+        "columns": 24,
+        "missing_cells": 44,
+        "duplicate_rows": 0,
+        "lookup_only_records": 5
+    },
+    "fertilizer_products": {
+        "status": "AVAILABLE",
+        "rows": 4,
+        "columns": 8,
+        "missing_cells": 0,
+        "duplicate_rows": 0
+    },
+    "crop_suitability": {
+        "status": "AVAILABLE",
+        "rows": 2200,
+        "columns": 23,
+        "missing_cells": 0,
+        "duplicate_rows": 0,
+        "ml_eligible": false,
+        "reason": "Unverified provenance, non-Karnataka geography, and crop suitability labels rather than fertilizer labels."
+    }
+}

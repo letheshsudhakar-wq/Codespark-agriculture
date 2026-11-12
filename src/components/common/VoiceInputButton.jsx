@@ -13,6 +13,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
   const { language, t } = useApp();
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
   const recognitionRef = useRef(null);
   const mountedRef = useRef(true);
   const completionTimerRef = useRef(null);
@@ -31,6 +32,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
   }, [status, error, onStatusChange]);
 
   const startRecognition = async () => {
+    if (isStarting) return;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setError(t.common.speechUnsupported);
@@ -43,10 +45,13 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
     }
 
     setError('');
+    setIsStarting(true);
     let permissionStream;
     try {
       permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       permissionStream.getTracks().forEach((track) => track.stop());
+
+      if (!mountedRef.current) return;
 
       const recognition = new SpeechRecognition();
       recognitionRef.current = recognition;
@@ -55,14 +60,17 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
-        if (mountedRef.current) setStatus('listening');
+        if (mountedRef.current) {
+          setIsStarting(false);
+          setStatus('listening');
+        }
       };
       recognition.onresult = (event) => {
         const transcript = event.results?.[0]?.[0]?.transcript?.trim();
         if (!transcript) return;
         if (mountedRef.current) {
           setStatus('processing');
-          onTranscript(transcript);
+          onTranscript?.(transcript);
           completionTimerRef.current = setTimeout(() => {
             if (mountedRef.current) setStatus('completed');
           }, 250);
@@ -70,6 +78,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
       };
       recognition.onerror = (event) => {
         if (!mountedRef.current) return;
+        setIsStarting(false);
         setStatus('idle');
         setError(
           event.error === 'not-allowed' || event.error === 'service-not-allowed'
@@ -79,6 +88,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
       };
       recognition.onend = () => {
         if (mountedRef.current) {
+          setIsStarting(false);
           setStatus((current) => current === 'listening' ? 'idle' : current);
         }
       };
@@ -86,6 +96,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
     } catch (error) {
       permissionStream?.getTracks().forEach((track) => track.stop());
       if (mountedRef.current) {
+        setIsStarting(false);
         setStatus('idle');
         setError(
           error.name === 'NotAllowedError' || error.name === 'SecurityError'
@@ -97,6 +108,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
   };
 
   const toggleRecognition = () => {
+    if (isStarting) return;
     if (status === 'listening') {
       recognitionRef.current?.stop();
       setStatus('idle');
@@ -116,6 +128,7 @@ export const VoiceInputButton = ({ onTranscript, onStatusChange, showStatus = tr
       <button
         type="button"
         onClick={toggleRecognition}
+        disabled={isStarting}
         className={`icon-btn ${status === 'listening' ? 'pulse-mic' : ''}`}
         aria-label={status === 'listening' ? t.common.stopRecording : t.common.startRecording}
         title={status === 'listening' ? t.common.stopRecording : t.common.startRecording}
