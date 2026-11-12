@@ -1,0 +1,249 @@
+==========================================================================================
+CASE: ragi, nothing else
+INPUT: {"crop": "ragi"}
+{
+  "input_crop": "ragi",
+  "tier_reached": "NEED_MORE_INFORMATION",
+  "outputs": {
+    "personalised_quantity": {
+      "supported": false,
+      "reason": "No verified soil-test-based equation or labelled records exist in the dataset for this crop/region; published STCR coefficients conflict.",
+      "request": "Get a laboratory Soil Health Card (N, P, K, pH, EC, OC) and consult the local Krishi Vigyan Kendra / UAS recommendation."
+    }
+  },
+  "missing_critical": [
+    [
+      "irrigation (rainfed or irrigated)",
+      "Documented ragi rates differ by water regime (50:40:25 vs 100:50:50)."
+    ],
+    [
+      "available nitrogen (alkaline KMnO4, kg/ha)",
+      "Soil N supply decides whether the generic N rate should be adjusted."
+    ],
+    [
+      "available phosphorus (Olsen or Bray-1; state whether as P or P2O5)",
+      "Controls whether the P2O5 rate is kept, raised or reduced."
+    ],
+    [
+      "available potassium (NH4OAc; state whether as K or K2O)",
+      "Controls whether the K2O rate is kept, raised or reduced."
+    ]
+  ],
+  "refusals": [],
+  "messages": []
+}
+==========================================================================================
+CASE: ragi irrigated
+INPUT: {"crop": "Ragi", "irrigation": "irrigated"}
+{
+  "input_crop": "ragi",
+  "tier_reached": "TIER_1_GENERIC",
+  "outputs": {
+    "generic_package_of_practice": {
+      "N_kg_ha": 100,
+      "P2O5_kg_ha": 50,
+      "K2O_kg_ha": 50,
+      "record": "REC-004",
+      "products": {
+        "urea_kg_ha": 174.9,
+        "dap_kg_ha": 108.7,
+        "mop_kg_ha": 83.3,
+        "note": "Arithmetic from nominal grades (urea 46% N; DAP 18-46-0; MOP 60% K2O); generic, not soil-test-adjusted"
+      },
+      "label": "GENERIC crop-level recommendation, NOT personalised to your soil"
+    },
+    "personalised_quantity": {
+      "supported": false,
+      "reason": "No verified soil-test-based equation or labelled records exist in the dataset for this crop/region; published STCR coefficients conflict.",
+      "request": "Get a laboratory Soil Health Card (N, P, K, pH, EC, OC) and consult the local Krishi Vigyan Kendra / UAS recommendation."
+    }
+  },
+  "missing_critical": [
+    [
+      "available nitrogen (alkaline KMnO4, kg/ha)",
+      "Soil N supply decides whether the generic N rate should be adjusted."
+    ],
+    [
+      "available phosphorus (Olsen or Bray-1; state whether as P or P2O5)",
+      "Controls whether the P2O5 rate is kept, raised or reduced."
+    ],
+    [
+      "available potassium (NH4OAc; state whether as K or K2O)",
+      "Controls whether the K2O rate is kept, raised or reduced."
+    ]
+  ],
+  "refusals": [],
+  "messages": []
+}
+==========================================================================================
+CASE: maize + full SHC-style values
+INPUT: {"crop": "maize", "avail_n_kg_ha": 250, "avail_n_method": "KMnO4", "p_value": 12, "p_basis": "P", "p_method": "Olsen", "k_value": 300, "k_basis": "K2O", "k_method": "NH4OAc", "oc_pct": 0.45, "soil_ph": 6.8}
+{
+  "input_crop": "maize",
+  "tier_reached": "TIER_2_SOIL_STATUS",
+  "outputs": {
+    "generic_package_of_practice": {
+      "N_kg_ha": 150,
+      "P2O5_kg_ha": 75,
+      "K2O_kg_ha": 40,
+      "record": "REC-005",
+      "products": {
+        "urea_kg_ha": 262.3,
+        "dap_kg_ha": 163.0,
+        "mop_kg_ha": 66.7,
+        "note": "Arithmetic from nominal grades (urea 46% N; DAP 18-46-0; MOP 60% K2O); generic, not soil-test-adjusted"
+      },
+      "label": "GENERIC crop-level recommendation, NOT personalised to your soil"
+    },
+    "soil_nutrient_status": {
+      "nitrogen": {
+        "value": 250.0,
+        "unit": "kg N/ha (KMnO4)",
+        "status": "low",
+        "threshold_source": "UAS-B/Karnataka 280-560",
+        "sensitive_to": [
+          "TNAU"
+        ]
+      },
+      "phosphorus": {
+        "value": 27.49,
+        "unit": "kg P2O5/ha (converted)",
+        "status": "medium",
+        "threshold_source": "UAS-B/Karnataka 22.9-56.0 as P2O5",
+        "sensitive_to": []
+      },
+      "potassium": {
+        "value": 300.0,
+        "unit": "kg K2O/ha",
+        "status": "medium",
+        "threshold_source": "UAS-B/Karnataka 141-336 as K2O",
+        "sensitive_to": []
+      },
+      "organic_carbon": {
+        "value": 0.45,
+        "unit": "% (Walkley-Black)",
+        "status": "low",
+        "threshold_source": "0.5-0.75 %"
+      }
+    },
+    "personalised_quantity": {
+      "supported": false,
+      "reason": "No verified soil-test-based equation or labelled records exist in the dataset for this crop/region; published STCR coefficients conflict.",
+      "request": "Get a laboratory Soil Health Card (N, P, K, pH, EC, OC) and consult the local Krishi Vigyan Kendra / UAS recommendation."
+    }
+  },
+  "missing_critical": [],
+  "refusals": [],
+  "messages": [
+    "nitrogen: class 'low' is near a boundary; other published tables would classify it differently (TNAU)."
+  ]
+}
+==========================================================================================
+CASE: paddy kharif, N without method, P near boundary
+INPUT: {"crop": "rice", "season": "kharif", "avail_n_kg_ha": 300, "p_value": 23, "p_basis": "P2O5", "p_method": "Olsen"}
+{
+  "input_crop": "paddy",
+  "tier_reached": "TIER_2_SOIL_STATUS",
+  "outputs": {
+    "generic_package_of_practice": {
+      "N_kg_ha": 100,
+      "P2O5_kg_ha": 50,
+      "K2O_kg_ha": 50,
+      "record": "REC-001",
+      "products": {
+        "urea_kg_ha": 174.9,
+        "dap_kg_ha": 108.7,
+        "mop_kg_ha": 83.3,
+        "note": "Arithmetic from nominal grades (urea 46% N; DAP 18-46-0; MOP 60% K2O); generic, not soil-test-adjusted"
+      },
+      "label": "GENERIC crop-level recommendation, NOT personalised to your soil"
+    },
+    "soil_nutrient_status": {
+      "phosphorus": {
+        "value": 23.0,
+        "unit": "kg P2O5/ha",
+        "status": "medium",
+        "threshold_source": "UAS-B/Karnataka 22.9-56.0 as P2O5",
+        "sensitive_to": [
+          "AP-J-Agril-Sci-2017",
+          "TNAU"
+        ]
+      }
+    },
+    "personalised_quantity": {
+      "supported": false,
+      "reason": "No verified soil-test-based equation or labelled records exist in the dataset for this crop/region; published STCR coefficients conflict.",
+      "request": "Get a laboratory Soil Health Card (N, P, K, pH, EC, OC) and consult the local Krishi Vigyan Kendra / UAS recommendation."
+    }
+  },
+  "missing_critical": [
+    [
+      "available potassium (NH4OAc; state whether as K or K2O)",
+      "Controls whether the K2O rate is kept, raised or reduced."
+    ]
+  ],
+  "refusals": [
+    "Nitrogen refused: method must be alkaline KMnO4 (available N). A value without method cannot be treated as available N."
+  ],
+  "messages": [
+    "phosphorus: class 'medium' is near a boundary; other published tables would classify it differently (AP-J-Agril-Sci-2017, TNAU)."
+  ]
+}
+==========================================================================================
+CASE: sugarcane
+INPUT: {"crop": "sugarcane"}
+{
+  "input_crop": "sugarcane",
+  "tier_reached": "TIER_0_REJECT",
+  "outputs": {},
+  "missing_critical": [],
+  "refusals": [],
+  "messages": [
+    "Crop not supported (supported: paddy, maize, ragi). No recommendation produced."
+  ]
+}
+==========================================================================================
+CASE: paddy with organic matter only
+INPUT: {"crop": "paddy", "season": "summer", "om_pct": 1.2}
+{
+  "input_crop": "paddy",
+  "tier_reached": "TIER_1_GENERIC",
+  "outputs": {
+    "generic_package_of_practice": {
+      "N_kg_ha": 120,
+      "P2O5_kg_ha": 60,
+      "K2O_kg_ha": 60,
+      "record": "REC-002",
+      "products": {
+        "urea_kg_ha": 209.8,
+        "dap_kg_ha": 130.4,
+        "mop_kg_ha": 100.0,
+        "note": "Arithmetic from nominal grades (urea 46% N; DAP 18-46-0; MOP 60% K2O); generic, not soil-test-adjusted"
+      },
+      "label": "GENERIC crop-level recommendation, NOT personalised to your soil"
+    },
+    "personalised_quantity": {
+      "supported": false,
+      "reason": "No verified soil-test-based equation or labelled records exist in the dataset for this crop/region; published STCR coefficients conflict.",
+      "request": "Get a laboratory Soil Health Card (N, P, K, pH, EC, OC) and consult the local Krishi Vigyan Kendra / UAS recommendation."
+    }
+  },
+  "missing_critical": [
+    [
+      "available nitrogen (alkaline KMnO4, kg/ha)",
+      "Soil N supply decides whether the generic N rate should be adjusted."
+    ],
+    [
+      "available phosphorus (Olsen or Bray-1; state whether as P or P2O5)",
+      "Controls whether the P2O5 rate is kept, raised or reduced."
+    ],
+    [
+      "available potassium (NH4OAc; state whether as K or K2O)",
+      "Controls whether the K2O rate is kept, raised or reduced."
+    ]
+  ],
+  "refusals": [
+    "Organic matter given: not converted to organic carbon (the 1.724 factor is a convention). Provide Walkley-Black OC."
+  ],
+  "messages": []
+}

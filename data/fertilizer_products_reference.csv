@@ -1,0 +1,5 @@
+product,pct_N,pct_P2O5,pct_K2O,nutrients_listed,source_status,conversion_P_to_P2O5,conversion_K_to_K2O
+urea,46,0,0,N,Nominal grades from general knowledge of the Fertiliser Control Order; NOT retrieved in this run - verify,2.2914,1.2046
+DAP,18,46,0,"N,P2O5",Nominal grades from general knowledge of the Fertiliser Control Order; NOT retrieved in this run - verify,2.2914,1.2046
+SSP,0,16,0,"P2O5 (+ S, not listed)",Nominal grades from general knowledge of the Fertiliser Control Order; NOT retrieved in this run - verify,2.2914,1.2046
+MOP (muriate of potash),0,0,60,K2O,Nominal grades from general knowledge of the Fertiliser Control Order; NOT retrieved in this run - verify,2.2914,1.2046
