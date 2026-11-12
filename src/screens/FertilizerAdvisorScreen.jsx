@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const FertilizerAdvisorScreen = () => {
-  const { farmInfo, soilReport, addFertilizerLog, t } = useApp();
+  const { farmInfo, soilReport, addFertilizerLog, t, localize } = useApp();
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [loggedSuccess, setLoggedSuccess] = useState(false);
 
@@ -52,7 +52,7 @@ export const FertilizerAdvisorScreen = () => {
                 Stage-Wise Nutrient Plan
               </span>
               <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--surface-white)', marginTop: '2px' }}>
-                {scheduleData.cropName} • {farmInfo.farmArea || '2.5'} Acres
+                {localize(scheduleData.cropName)} • {farmInfo.farmArea || '2.5'} {localize('Acres')}
               </h2>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -122,10 +122,10 @@ export const FertilizerAdvisorScreen = () => {
                         </span>
                       )}
                       <h3 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)' }}>
-                        {stg.stageName}
+                        {localize(stg.stageName)}
                       </h3>
                       <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                        {stg.timing}
+                        {localize(stg.timing)}
                       </span>
                     </div>
                   </div>
@@ -149,10 +149,10 @@ export const FertilizerAdvisorScreen = () => {
                         >
                           <div>
                             <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)', display: 'block' }}>
-                              {fert.name}
+                              {localize(fert.name)}
                             </span>
                             <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                              {fert.dosePerAcre} kg / acre ({fert.bagEquivalent})
+                              {fert.dosePerAcre} {localize('kg / acre')} ({localize(fert.bagEquivalent)})
                             </span>
                           </div>
 
@@ -171,7 +171,7 @@ export const FertilizerAdvisorScreen = () => {
 
                   {/* Precaution */}
                   <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '6px' }}>
-                    💡 {stg.precautions}
+                    💡 {localize(stg.precautions)}
                   </p>
 
                   {/* Log button for current stage */}
@@ -213,8 +213,8 @@ export const FertilizerAdvisorScreen = () => {
                 }}
               >
                 <div>
-                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{cost.item}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>{cost.qtyNeeded}</span>
+                  <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{localize(cost.item)}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>{localize(cost.qtyNeeded)}</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <strong style={{ color: 'var(--dark-green)' }}>₹{Math.round(cost.totalPerAcre * areaNumber)}</strong>
@@ -279,4 +279,3 @@ export const FertilizerAdvisorScreen = () => {
     </div>
   );
 };
-

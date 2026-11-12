@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Sprout, Bell, User, ArrowLeft, Globe } from 'lucide-react';
 
 export const Header = ({ showBack = false, title = null }) => {
-  const { currentScreen, goBack, navigate, setShowNotifications, notifications, language, changeLanguage, t } = useApp();
+  const { currentScreen, goBack, navigate, setShowNotifications, notifications, language, t, localize } = useApp();
   
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -14,7 +14,7 @@ export const Header = ({ showBack = false, title = null }) => {
           <button 
             onClick={goBack} 
             className="icon-btn" 
-            aria-label="Go back"
+            aria-label={t.common.back}
             style={{ width: '38px', height: '38px' }}
           >
             <ArrowLeft size={20} color="#075C28" />
@@ -43,7 +43,7 @@ export const Header = ({ showBack = false, title = null }) => {
         <button 
           className="icon-btn" 
           onClick={() => navigate('language')}
-          title="Change Language"
+          title={t.profile?.changeLang || t.languageScreen?.title}
           style={{ width: 'auto', padding: '0 10px', gap: '4px', fontSize: '12px', fontWeight: '700' }}
         >
           <Globe size={15} color="#075C28" />
@@ -54,8 +54,8 @@ export const Header = ({ showBack = false, title = null }) => {
         <button 
           className="icon-btn" 
           onClick={() => setShowNotifications(true)}
-          aria-label="View notifications"
-          title="Notifications"
+          aria-label={localize('Notifications')}
+          title={localize('Notifications')}
         >
           <Bell size={19} color="#18251B" />
           {unreadCount > 0 && <span className="badge-dot" />}
@@ -65,8 +65,8 @@ export const Header = ({ showBack = false, title = null }) => {
         <button 
           className="icon-btn" 
           onClick={() => navigate('profile')}
-          aria-label="Farmer profile"
-          title="Profile"
+          aria-label={t.profile?.title || 'Profile'}
+          title={t.profile?.title || 'Profile'}
           style={{ backgroundColor: currentScreen === 'profile' ? 'var(--light-green)' : 'var(--surface-white)' }}
         >
           <User size={19} color="#075C28" />
@@ -75,4 +75,3 @@ export const Header = ({ showBack = false, title = null }) => {
     </header>
   );
 };
-

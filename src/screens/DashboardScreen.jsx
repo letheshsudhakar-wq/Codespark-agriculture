@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Header } from '../components/common/Header';
+import { CROPS } from '../constants/agronomyData';
 import { 
   FlaskConical, 
   Sprout, 
@@ -28,7 +29,9 @@ export const DashboardScreen = () => {
     toggleReminder, 
     addReminder, 
     navigate, 
-    t 
+    t,
+    localize,
+    language
   } = useApp();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -46,6 +49,8 @@ export const DashboardScreen = () => {
 
   const pendingReminders = reminders.filter(r => !r.completed);
   const completedReminders = reminders.filter(r => r.completed);
+  const crop = CROPS.find((item) => item.id === farmInfo.crop);
+  const cropLabel = crop?.[language === 'kn' ? 'kannada' : language === 'hi' ? 'hindi' : language === 'ta' ? 'tamil' : 'name'] || farmInfo.crop;
 
   return (
     <div className="screen-container">
@@ -76,10 +81,10 @@ export const DashboardScreen = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
             <div>
               <span className="pill-badge pill-dark" style={{ fontSize: '10.5px', padding: '3px 10px', textTransform: 'uppercase' }}>
-                {farmInfo.crop?.toUpperCase() || 'PADDY'} • {farmInfo.farmArea || '2.5'} ACRES
+                {cropLabel} • {farmInfo.farmArea || '2.5'} {localize('Acres')}
               </span>
               <h2 style={{ fontSize: '21px', fontWeight: '800', color: 'var(--deep-navy)', marginTop: '8px', letterSpacing: '-0.4px', lineHeight: '1.2' }}>
-                {farmInfo.growthStage === 'vegetative' ? 'Active Tillering Phase' : 'Current Crop Stage'}
+                {localize(farmInfo.growthStage === 'vegetative' ? 'Active Tillering Phase' : 'Current Crop Stage')}
               </h2>
             </div>
             <div style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-sm)' }}>
@@ -89,7 +94,7 @@ export const DashboardScreen = () => {
 
           <p style={{ fontSize: '13.5px', color: '#171632', lineHeight: '1.45', marginBottom: '16px', fontWeight: '500' }}>
             {soilReport.hasReport ? (
-              <span>Verified soil report active. pH is <strong>6.8 (Optimal)</strong>. Next top dressing of Urea is scheduled for tillering.</span>
+              <span>{localize('Verified soil report active. pH is')} <strong>6.8 ({localize('Optimal')})</strong>. {localize('Next top dressing of Urea is scheduled for tillering.')}</span>
             ) : (
               <span>Preliminary field assessment active. Lab testing recommended to optimize your fertilizer budget.</span>
             )}
@@ -136,26 +141,26 @@ export const DashboardScreen = () => {
                   </span>
                 </div>
                 <span className="pill-badge pill-green" style={{ fontSize: '10.5px' }}>
-                  Healthy
+                  {localize('Healthy')}
                 </span>
               </div>
 
               {/* 3 Parameter Micro-Cards */}
               <div className="grid-3">
                 <div style={{ backgroundColor: '#F8FAF5', padding: '10px 8px', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Soil pH</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>{localize('Soil pH')}</span>
                   <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>6.8</strong>
-                  <span style={{ fontSize: '10px', color: '#075C28', display: 'block', fontWeight: '700' }}>Optimal</span>
+                  <span style={{ fontSize: '10px', color: '#075C28', display: 'block', fontWeight: '700' }}>{localize('Optimal')}</span>
                 </div>
                 <div style={{ backgroundColor: '#F8FAF5', padding: '10px 8px', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Nitrogen (N)</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>{localize('Nitrogen (N)')}</span>
                   <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>235</strong>
-                  <span style={{ fontSize: '10px', color: '#D97706', display: 'block', fontWeight: '700' }}>Medium</span>
+                  <span style={{ fontSize: '10px', color: '#D97706', display: 'block', fontWeight: '700' }}>{localize('Medium')}</span>
                 </div>
                 <div style={{ backgroundColor: '#F8FAF5', padding: '10px 8px', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Org. Carbon</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>{localize('Org. Carbon')}</span>
                   <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>0.54%</strong>
-                  <span style={{ fontSize: '10px', color: '#EF4444', display: 'block', fontWeight: '700' }}>Mod. Low</span>
+                  <span style={{ fontSize: '10px', color: '#EF4444', display: 'block', fontWeight: '700' }}>{localize('Mod. Low')}</span>
                 </div>
               </div>
             </div>
@@ -295,21 +300,21 @@ export const DashboardScreen = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
               <CloudSun size={18} color="var(--lime-green)" />
               <span style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {farmInfo.location || 'Mandya'} Forecast
+              {farmInfo.location || 'Mandya'} {localize('Forecast')}
               </span>
             </div>
             <div style={{ fontSize: '22px', fontWeight: '800' }}>
-              29°C <span style={{ fontSize: '13px', fontWeight: '500', color: 'rgba(255,255,255,0.8)' }}>• Partly Cloudy</span>
+              29°C <span style={{ fontSize: '13px', fontWeight: '500', color: 'rgba(255,255,255,0.8)' }}>• {localize('Partly Cloudy')}</span>
             </div>
             <p style={{ fontSize: '11.5px', color: 'var(--lime-green)', marginTop: '4px' }}>
-              Rain Probability: Low (12%) • Safe for field activities
+              {localize('Rain Probability')}: {localize('Low')} (12%) • {localize('Safe for field activities')}
             </p>
           </div>
 
           <div style={{ textAlign: 'right', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '14px' }}>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', display: 'block' }}>Humidity</span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', display: 'block' }}>{localize('Humidity')}</span>
             <strong style={{ fontSize: '15px' }}>64%</strong>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', display: 'block', marginTop: '2px' }}>Wind</span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', display: 'block', marginTop: '2px' }}>{localize('Wind')}</span>
             <strong style={{ fontSize: '13px' }}>11 km/h</strong>
           </div>
         </div>
@@ -365,10 +370,10 @@ export const DashboardScreen = () => {
                         textDecoration: rem.completed ? 'line-through' : 'none'
                       }}
                     >
-                      {rem.title}
+                      {localize(rem.title)}
                     </h4>
                     <span className="pill-badge pill-green" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                      {rem.category}
+                      {localize(rem.category)}
                     </span>
                   </div>
                   <p 
@@ -379,7 +384,7 @@ export const DashboardScreen = () => {
                       textDecoration: rem.completed ? 'line-through' : 'none'
                     }}
                   >
-                    {rem.subtitle}
+                    {localize(rem.subtitle)}
                   </p>
                 </div>
               </div>
@@ -443,4 +448,3 @@ export const DashboardScreen = () => {
     </div>
   );
 };
-

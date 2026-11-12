@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { VoiceInputButton } from '../components/common/VoiceInputButton';
 import { CROPS, GROWTH_STAGES, IRRIGATION_METHODS } from '../constants/agronomyData';
 import { ArrowLeft, ArrowRight, Check, HelpCircle } from 'lucide-react';
 
 export const FarmInfoScreen = () => {
-  const { farmInfo, updateFarmInfo, soilReport, navigate, goBack, t } = useApp();
+  const { farmInfo, updateFarmInfo, soilReport, navigate, goBack, t, language, localize } = useApp();
 
   // Multi-step progressive form (1-3 questions per step)
   const [subStep, setSubStep] = useState(1);
@@ -120,26 +121,32 @@ export const FarmInfoScreen = () => {
               <label className="form-label">
                 {t.farmInfo?.farmerName || "Farmer's Full Name"} *
               </label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder={t.farmInfo?.farmerNamePlaceholder || "e.g., Ramesh Kumar"}
-                value={formData.farmerName}
-                onChange={(e) => handleChange('farmerName', e.target.value)}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder={t.farmInfo?.farmerNamePlaceholder || "e.g., Ramesh Kumar"}
+                  value={formData.farmerName}
+                  onChange={(e) => handleChange('farmerName', e.target.value)}
+                />
+                <VoiceInputButton onTranscript={(text) => handleChange('farmerName', text)} />
+              </div>
             </div>
 
             <div className="form-group">
               <label className="form-label">
                 {t.farmInfo?.location || "Farm Location (Village / District, State)"} *
               </label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder={t.farmInfo?.locationPlaceholder || "e.g., Mandya, Karnataka"}
-                value={formData.location}
-                onChange={(e) => handleChange('location', e.target.value)}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder={t.farmInfo?.locationPlaceholder || "e.g., Mandya, Karnataka"}
+                  value={formData.location}
+                  onChange={(e) => handleChange('location', e.target.value)}
+                />
+                <VoiceInputButton onTranscript={(text) => handleChange('location', text)} />
+              </div>
               <span style={{ fontSize: '11.5px', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
                 Used to fetch local weather advisories & package of practices.
               </span>
@@ -171,7 +178,7 @@ export const FarmInfoScreen = () => {
                     >
                       <span style={{ fontSize: '24px' }}>{crop.icon}</span>
                       <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)' }}>
-                        {crop.name}
+                        {crop[language === 'kn' ? 'kannada' : language === 'hi' ? 'hindi' : language === 'ta' ? 'tamil' : 'name']}
                       </span>
                     </div>
                   );
@@ -240,7 +247,7 @@ export const FarmInfoScreen = () => {
                         <span style={{ fontSize: '20px' }}>{stg.icon}</span>
                         <div>
                           <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                            {stg.name}
+                            {localize(stg.name)}
                           </span>
                           <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'block' }}>
                             {stg.days}
@@ -263,7 +270,7 @@ export const FarmInfoScreen = () => {
               >
                 {IRRIGATION_METHODS.map((irr) => (
                   <option key={irr.id} value={irr.id}>
-                    {irr.name} ({irr.efficiency})
+                    {localize(irr.name)} ({localize(irr.efficiency)})
                   </option>
                 ))}
               </select>
@@ -285,13 +292,16 @@ export const FarmInfoScreen = () => {
               <label className="form-label">
                 Previous Fertilizers Used <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>(Optional)</span>
               </label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g., 1 bag Urea, 1 bag DAP, or 'I don't know'"
-                value={formData.previousFertilizers}
-                onChange={(e) => handleChange('previousFertilizers', e.target.value)}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g., 1 bag Urea, 1 bag DAP, or 'I don't know'"
+                  value={formData.previousFertilizers}
+                  onChange={(e) => handleChange('previousFertilizers', e.target.value)}
+                />
+                <VoiceInputButton onTranscript={(text) => handleChange('previousFertilizers', text)} />
+              </div>
               <button 
                 type="button" 
                 onClick={() => handleChange('previousFertilizers', "I don't know")}
@@ -342,7 +352,7 @@ export const FarmInfoScreen = () => {
                       }}
                     >
                       <span style={{ color: 'var(--text-main)', fontWeight: isChecked ? '700' : '500' }}>
-                        {issue}
+                        {localize(issue)}
                       </span>
                       {isChecked && <Check size={16} color="#075C28" strokeWidth={3} />}
                     </div>
@@ -368,4 +378,3 @@ export const FarmInfoScreen = () => {
     </div>
   );
 };
-

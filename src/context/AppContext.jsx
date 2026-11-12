@@ -4,9 +4,10 @@ import {
   SAMPLE_LAB_REPORT,
   INITIAL_REMINDERS,
   HISTORICAL_REPORTS,
-  HISTORICAL_FERTILIZERS,
-  DEMO_CHAT_QA
+  HISTORICAL_FERTILIZERS
 } from '../constants/agronomyData';
+import { getChatIntent, getChatResponse } from '../constants/chatResponses';
+import { localizeText } from '../constants/localization';
 
 const AppContext = createContext();
 
@@ -31,6 +32,7 @@ export const AppProvider = ({ children }) => {
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [screenHistory, setScreenHistory] = useState(['welcome']);
   const [language, setLanguage] = useState('en');
+  const [stateLoaded, setStateLoaded] = useState(false);
   
   // Soil Report State (whether verified lab report is attached)
   const [soilReport, setSoilReport] = useState({
@@ -56,7 +58,7 @@ export const AppProvider = ({ children }) => {
     {
       id: 'msg-init-1',
       sender: 'bot',
-      text: 'Namaste Farmer! I am your AGRIWISE AI Agricultural Assistant. How can I help you with your soil, crops, or fertilizers today?',
+      responseKey: 'greeting',
       sources: ['ICAR & State Agriculture Universities Package of Practices'],
       time: 'Just now',
     }
@@ -115,11 +117,14 @@ export const AppProvider = ({ children }) => {
       }
     } catch (e) {
       console.warn('Could not read from localStorage', e);
+    } finally {
+      setStateLoaded(true);
     }
   }, []);
 
   // Save to localStorage on changes
   useEffect(() => {
+    if (!stateLoaded) return;
     try {
       const stateToSave = {
         currentScreen,
@@ -127,7 +132,9 @@ export const AppProvider = ({ children }) => {
         soilReport,
         farmInfo,
         reminders,
-        chatMessages,
+        chatMessages: chatMessages.map((message) => message.image
+          ? { ...message, image: { name: message.image.name, size: message.image.size, type: message.image.type } }
+          : message),
         historicalReports,
         fertilizerLogs
       };
@@ -135,7 +142,7 @@ export const AppProvider = ({ children }) => {
     } catch (e) {
       console.warn('Could not save to localStorage', e);
     }
-  }, [currentScreen, language, soilReport, farmInfo, reminders, chatMessages, historicalReports, fertilizerLogs]);
+  }, [stateLoaded, currentScreen, language, soilReport, farmInfo, reminders, chatMessages, historicalReports, fertilizerLogs]);
 
   // Screen Navigation Helper
   const navigate = (newScreen) => {
@@ -168,6 +175,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const t = translations[language] || translations.en;
+  const localize = (value) => localizeText(value, language);
 
   // Reminders actions
   const toggleReminder = (id) => {
@@ -245,41 +253,27 @@ export const AppProvider = ({ children }) => {
 
     setChatMessages((prev) => [...prev, userMsg]);
 
-    // Match demo agronomy question or fallback
-    const lower = userText.toLowerCase();
-    const matched = DEMO_CHAT_QA.find((item) =>
-      item.triggers.some((trig) => lower.includes(trig))
-    );
+    const intent = attachedImage ? 'imageUnavailable' : getChatIntent(userText);
 
     setTimeout(() => {
-      let botResponse;
-      if (attachedImage) {
-        botResponse = {
-          id: 'msg-bot-' + Date.now(),
-          sender: 'bot',
-          text: `[Leaf Photo Analysis Prototype]\n\nBased on the uploaded image of your ${farmInfo.crop || 'crop'} leaf:\n\n- **Visual Pattern Detected:** Mild chlorotic interveinal yellowing with brown leaf margins.\n- **Likely Cause:** Zinc (Zn) deficiency or early moisture stress.\n- **Immediate Guidance:** Check soil moisture. Avoid water stagnation. Consider foliar spray of Chelated Zinc (Zn-EDTA 0.15% @ 1.5g/L water).\n\n*(Notice: This is a demo visual check. In production, this image is evaluated by our verified multimodal agricultural model).*`,
-          sources: ['ICAR Crop Pathology Guide', 'TNAU Leaf Color Chart Standards'],
-          time: 'Just now'
-        };
-      } else if (matched) {
-        botResponse = {
-          id: 'msg-bot-' + Date.now(),
-          sender: 'bot',
-          text: matched.answer,
-          sources: matched.sources,
-          time: 'Just now'
-        };
-      } else {
-        botResponse = {
-          id: 'msg-bot-' + Date.now(),
-          sender: 'bot',
-          text: `Thank you for your question about ${farmInfo.crop || 'your crop'}. For your ${farmInfo.farmArea} acre plot in ${farmInfo.location || 'your area'}, ensuring balanced nutrition (Nitrogen, Phosphorus, Potassium) and adequate soil organic matter is the foundation for healthy yield.\n\nCould you specify whether you are asking about **pest management**, **fertilizer split doses**, or **soil testing**? You can also tap one of the suggested questions above.`,
-          sources: ['State Agricultural University Agronomy Guidelines'],
-          time: 'Just now'
-        };
-      }
-      setChatMessages((prev) => [...prev, botResponse]);
+      setChatMessages((prev) => [...prev, {
+        id: 'msg-bot-' + Date.now(),
+        sender: 'bot',
+        responseKey: intent,
+        sources: intent === 'imageUnavailable' ? [] : ['ICAR & State Agricultural University guidance'],
+        time: 'Just now',
+      }]);
     }, 700);
+  };
+
+  const getChatMessageText = (message) => {
+    if (message.responseKey) {
+      return getChatResponse(language, message.responseKey, {
+        area: farmInfo.farmArea || '2.5',
+        location: farmInfo.location || (language === 'en' ? 'your area' : ''),
+      });
+    }
+    return message.text;
   };
 
   const clearChat = () => {
@@ -287,7 +281,7 @@ export const AppProvider = ({ children }) => {
       {
         id: 'msg-init-reset',
         sender: 'bot',
-        text: 'Chat history cleared. How can I assist you with your farming decisions today?',
+        responseKey: 'greeting',
         sources: ['ICAR & State Agriculture Universities Package of Practices'],
         time: 'Just now'
       }
@@ -338,6 +332,7 @@ export const AppProvider = ({ children }) => {
         language,
         changeLanguage,
         t,
+        localize,
         soilReport,
         setSoilReport,
         loadSampleSoilReport,
@@ -349,6 +344,7 @@ export const AppProvider = ({ children }) => {
         toggleReminder,
         addReminder,
         chatMessages,
+        getChatMessageText,
         sendChatMessage,
         clearChat,
         historicalReports,
@@ -368,4 +364,3 @@ export const AppProvider = ({ children }) => {
 };
 
 export const useApp = () => useContext(AppContext);
-
