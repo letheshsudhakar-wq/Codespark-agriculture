@@ -887,3 +887,19 @@ export const translations = {
   }
 };
 
+
+// Additional language support.
+// English fallback is intentional until verified translations are added.
+Object.assign(translations, {
+  te: translations.en,
+  ml: translations.en,
+  mr: translations.en,
+  bn: translations.en,
+  gu: translations.en,
+  pa: translations.en,
+  ur: translations.en,
+  or: translations.en,
+  as: translations.en,
+  kok: translations.en,
+  tcy: translations.en,
+});
