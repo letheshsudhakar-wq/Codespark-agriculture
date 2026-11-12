@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const SoilDetailsScreen = () => {
-  const { soilReport, navigate, loadSampleSoilReport, t } = useApp();
+  const { soilReport, navigate, loadSampleSoilReport, t, localize } = useApp();
   const [expandedParam, setExpandedParam] = useState('ph');
 
   const params = soilReport.parameters || {};
@@ -59,7 +59,7 @@ export const SoilDetailsScreen = () => {
                     <span>{t.soilDetails?.labReportHeader || 'Laboratory Soil Health Card'}</span>
                   </div>
                   <h2 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-main)', lineHeight: '1.3' }}>
-                    {soilReport.labName || 'Krishi Vigyan Kendra (KVK) Soil Lab'}
+                    {localize(soilReport.labName || 'Krishi Vigyan Kendra (KVK) Soil Lab')}
                   </h2>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                     {t.soilDetails?.testDate || 'Test Date'}: {soilReport.testDate || '15 Oct 2026'} • Sample #8842
@@ -72,7 +72,7 @@ export const SoilDetailsScreen = () => {
             <div style={{ backgroundColor: 'var(--light-green)', borderRadius: 'var(--radius-md)', padding: '12px 14px', border: '1px solid var(--light-green-border)', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Leaf size={20} color="#075C28" flexShrink={0} />
               <p style={{ fontSize: '12.5px', color: 'var(--dark-green)', fontWeight: '600', lineHeight: '1.4' }}>
-                Your soil pH is in the <strong>optimal range (6.8)</strong>. Focus on raising organic carbon with farmyard manure and balancing zinc.
+                {localize('Your soil pH is in the')} <strong>{localize('optimal range')} (6.8)</strong>. {localize('Focus on raising organic carbon with farmyard manure and balancing zinc.')}
               </p>
             </div>
 
@@ -93,7 +93,7 @@ export const SoilDetailsScreen = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
-                          {item.name}
+                          {localize(item.name)}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                           <span style={{ fontSize: '18px', fontWeight: '800', color: 'var(--dark-green)' }}>
@@ -109,7 +109,7 @@ export const SoilDetailsScreen = () => {
                               borderRadius: 'var(--radius-pill)'
                             }}
                           >
-                            {item.statusLabel}
+                            {localize(item.statusLabel)}
                           </span>
                         </div>
                       </div>
@@ -127,9 +127,9 @@ export const SoilDetailsScreen = () => {
                       />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: 'var(--text-light)' }}>
-                      <span>Low</span>
-                      <span>Target: {item.range}</span>
-                      <span>High</span>
+                      <span>{localize('Low')}</span>
+                      <span>{localize('Target')}: {localize(item.range)}</span>
+                      <span>{localize('High')}</span>
                     </div>
 
                     {/* Expandable Explanation & Recommendation */}
@@ -140,7 +140,7 @@ export const SoilDetailsScreen = () => {
                             {t.soilDetails?.whatItMeans || 'What This Means for Your Crop'}
                           </span>
                           <p style={{ fontSize: '12.5px', color: 'var(--text-main)', marginTop: '2px', lineHeight: '1.45' }}>
-                            {item.description}
+                            {localize(item.description)}
                           </p>
                         </div>
 
@@ -149,7 +149,7 @@ export const SoilDetailsScreen = () => {
                             {t.soilDetails?.recommendation || 'Recommended Soil Practice'}
                           </span>
                           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.45' }}>
-                            {item.recommendation}
+                            {localize(item.recommendation)}
                           </p>
                         </div>
                       </div>
@@ -265,4 +265,3 @@ export const SoilDetailsScreen = () => {
     </div>
   );
 };
-

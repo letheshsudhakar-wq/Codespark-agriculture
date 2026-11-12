@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { ArrowLeft, ArrowRight, Check, Globe } from 'lucide-react';
 
 export const LanguageSelectionScreen = () => {
-  const { language, changeLanguage, navigate, goBack, t } = useApp();
+  const { language, changeLanguage, navigate, goBack, screenHistory, t, localize } = useApp();
   const [selected, setSelected] = useState(language);
 
   const languages = [
@@ -44,7 +44,12 @@ export const LanguageSelectionScreen = () => {
 
   const handleContinue = () => {
     changeLanguage(selected);
-    navigate('soil-report-choice');
+    const previousScreen = screenHistory[screenHistory.length - 2];
+    if (previousScreen && previousScreen !== 'welcome') {
+      goBack();
+    } else {
+      navigate('soil-report-choice');
+    }
   };
 
   return (
@@ -57,7 +62,7 @@ export const LanguageSelectionScreen = () => {
           </button>
           <div>
             <span style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--dark-green)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              Step 1 of 4 • Onboarding
+              {localize('Step 1 of 4 • Onboarding')}
             </span>
             <h1 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
               {t.languageScreen?.title || 'Choose Your Language'}
@@ -119,7 +124,7 @@ export const LanguageSelectionScreen = () => {
                       </span>
                     </div>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {lang.region}
+                      {localize(lang.region)}
                     </span>
                   </div>
                 </div>
@@ -165,4 +170,3 @@ export const LanguageSelectionScreen = () => {
     </div>
   );
 };
-

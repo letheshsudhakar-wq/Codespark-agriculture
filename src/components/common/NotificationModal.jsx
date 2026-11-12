@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { X, CloudRain, Sprout, Building2, CheckCircle2 } from 'lucide-react';
 
 export const NotificationModal = () => {
-  const { showNotifications, setShowNotifications, notifications } = useApp();
+  const { showNotifications, setShowNotifications, notifications, t, localize } = useApp();
 
   if (!showNotifications) return null;
 
@@ -22,16 +22,16 @@ export const NotificationModal = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)' }}>
-              Farm Alerts & Notifications
+              {localize('Farm Alerts & Notifications')}
             </h2>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Real-time weather, crop & advisory updates
+              {localize('Real-time weather, crop & advisory updates')}
             </p>
           </div>
           <button 
             className="icon-btn" 
             onClick={() => setShowNotifications(false)}
-            aria-label="Close notifications"
+            aria-label={t.common.close}
           >
             <X size={20} />
           </button>
@@ -69,12 +69,12 @@ export const NotificationModal = () => {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                    {n.title}
+                    {localize(n.title)}
                   </h3>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{n.time}</span>
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  {n.message}
+                  {localize(n.message)}
                 </p>
               </div>
             </div>
@@ -86,10 +86,9 @@ export const NotificationModal = () => {
           onClick={() => setShowNotifications(false)}
           style={{ marginTop: '20px' }}
         >
-          Close Alerts
+          {t.common.close}
         </button>
       </div>
     </div>
   );
 };
-
