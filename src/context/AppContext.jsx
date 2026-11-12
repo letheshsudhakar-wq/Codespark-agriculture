@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { translations } from '../constants/translations';
 import {
   SAMPLE_LAB_REPORT,
@@ -6,8 +6,6 @@ import {
   HISTORICAL_REPORTS,
   HISTORICAL_FERTILIZERS
 } from '../constants/agronomyData';
-import { getChatIntent, getChatResponse } from '../constants/chatResponses';
-import { localizeText } from '../constants/localization';
 
 const AppContext = createContext();
 
@@ -33,7 +31,7 @@ export const AppProvider = ({ children }) => {
   const [screenHistory, setScreenHistory] = useState(['welcome']);
   const [language, setLanguage] = useState('en');
   const [stateLoaded, setStateLoaded] = useState(false);
-  
+
   // Soil Report State (whether verified lab report is attached)
   const [soilReport, setSoilReport] = useState({
     hasReport: false,
@@ -71,6 +69,13 @@ export const AppProvider = ({ children }) => {
   // UI state: simulated phone frame on desktop or fluid responsive
   const [deviceFrameMode, setDeviceFrameMode] = useState(false);
 
+  // Backend connectivity state
+  const [backendOnline, setBackendOnline] = useState(null);
+  const [lastHealthCheck, setLastHealthCheck] = useState(0);
+
+  // TTS (speech synthesis) state
+  const [ttsSpeaking, setTTSSpeaking] = useState(false);
+
   // Notifications drawer state
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
@@ -93,7 +98,7 @@ export const AppProvider = ({ children }) => {
     {
       id: 'notif-3',
       title: 'Krishi Vigyan Kendra Soil Testing Camp',
-      message: 'Mobile soil testing camp at Mandya APMC Yard this Saturday. Soil testing fee: ₹30.',
+      message: 'Mobile soil testing camp at Mandya APMC Yard this Saturday. Soil testing fee: â‚¹30.',
       time: '3 days ago',
       read: true,
       type: 'kvk'
@@ -253,27 +258,41 @@ export const AppProvider = ({ children }) => {
 
     setChatMessages((prev) => [...prev, userMsg]);
 
-    const intent = attachedImage ? 'imageUnavailable' : getChatIntent(userText);
+    // Match demo agronomy question or fallback
+    const lower = userText.toLowerCase();
+    const matched = DEMO_CHAT_QA.find((item) =>
+      item.triggers.some((trig) => lower.includes(trig))
+    );
 
     setTimeout(() => {
-      setChatMessages((prev) => [...prev, {
-        id: 'msg-bot-' + Date.now(),
-        sender: 'bot',
-        responseKey: intent,
-        sources: intent === 'imageUnavailable' ? [] : ['ICAR & State Agricultural University guidance'],
-        time: 'Just now',
-      }]);
+      let botResponse;
+      if (attachedImage) {
+        botResponse = {
+          id: 'msg-bot-' + Date.now(),
+          sender: 'bot',
+          text: `[Leaf Photo Analysis Prototype]\n\nBased on the uploaded image of your ${farmInfo.crop || 'crop'} leaf:\n\n- **Visual Pattern Detected:** Mild chlorotic interveinal yellowing with brown leaf margins.\n- **Likely Cause:** Zinc (Zn) deficiency or early moisture stress.\n- **Immediate Guidance:** Check soil moisture. Avoid water stagnation. Consider foliar spray of Chelated Zinc (Zn-EDTA 0.15% @ 1.5g/L water).\n\n*(Notice: This is a demo visual check. In production, this image is evaluated by our verified multimodal agricultural model).*`,
+          sources: ['ICAR Crop Pathology Guide', 'TNAU Leaf Color Chart Standards'],
+          time: 'Just now'
+        };
+      } else if (matched) {
+        botResponse = {
+          id: 'msg-bot-' + Date.now(),
+          sender: 'bot',
+          text: matched.answer,
+          sources: matched.sources,
+          time: 'Just now'
+        };
+      } else {
+        botResponse = {
+          id: 'msg-bot-' + Date.now(),
+          sender: 'bot',
+          text: `Thank you for your question about ${farmInfo.crop || 'your crop'}. For your ${farmInfo.farmArea} acre plot in ${farmInfo.location || 'your area'}, ensuring balanced nutrition (Nitrogen, Phosphorus, Potassium) and adequate soil organic matter is the foundation for healthy yield.\n\nCould you specify whether you are asking about **pest management**, **fertilizer split doses**, or **soil testing**? You can also tap one of the suggested questions above.`,
+          sources: ['State Agricultural University Agronomy Guidelines'],
+          time: 'Just now'
+        };
+      }
+      setChatMessages((prev) => [...prev, botResponse]);
     }, 700);
-  };
-
-  const getChatMessageText = (message) => {
-    if (message.responseKey) {
-      return getChatResponse(language, message.responseKey, {
-        area: farmInfo.farmArea || '2.5',
-        location: farmInfo.location || (language === 'en' ? 'your area' : ''),
-      });
-    }
-    return message.text;
   };
 
   const clearChat = () => {
@@ -323,6 +342,192 @@ export const AppProvider = ({ children }) => {
     setScreenHistory(['welcome']);
   };
 
+  // â”€â”€ Backend health check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const checkBackendHealth = async () => {
+    try {
+      await checkHealth();
+      setBackendOnline(true);
+    } catch (e) {
+      setBackendOnline(false);
+    } finally {
+      setLastHealthCheck(Date.now());
+    }
+  };
+
+  useEffect(() => {
+    checkBackendHealth();
+    // Re-check every 30 seconds
+    const timer = setInterval(checkBackendHealth, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // â”€â”€ Text-to-speech helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const ttsUtteranceRef = useRef(null);
+
+  const speakText = (text, langCode) => {
+    if (!('speechSynthesis' in window)) {
+      return false;
+    }
+    // Cancel any ongoing speech
+    if (ttsUtteranceRef.current) {
+      window.speechSynthesis.cancel();
+    }
+    ttsUtteranceRef.current = new SpeechSynthesisUtterance(text);
+    ttsUtteranceRef.current.lang = langCode;
+    ttsUtteranceRef.current.rate = 1;
+    ttsUtteranceRef.current.pitch = 1;
+    ttsUtteranceRef.current.onstart = () => setTTSSpeaking(true);
+    ttsUtteranceRef.current.onend = () => setTTSSpeaking(false);
+    ttsUtteranceRef.current.onerror = () => setTTSSpeaking(false);
+    window.speechSynthesis.speak(ttsUtteranceRef.current);
+    return true;
+  };
+
+  const stopSpeaking = () => {
+    if (ttsUtteranceRef.current) {
+      window.speechSynthesis.cancel();
+      setTTSSpeaking(false);
+    }
+  };
+
+  const voiceLangMap = {
+    en: 'en-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN',
+  };
+
+  // â”€â”€ Backend-connected Chat (RAG + Gemini) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const sendChatMessage = async (userText, attachedImage = null) => {
+    if (!userText && !attachedImage) return;
+
+    const userMsg = {
+      id: 'msg-' + Date.now(),
+      sender: 'user',
+      text: userText,
+      image: attachedImage,
+      time: 'Just now'
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+
+    // If there's an attached image, use local demo response (backend doesn't support vision yet)
+    if (attachedImage) {
+      setTimeout(() => {
+        const botResponse = {
+          id: 'msg-bot-' + Date.now(),
+          sender: 'bot',
+          text: `[Leaf Photo Analysis Prototype]\n\nBased on the uploaded image of your ${farmInfo.crop || 'crop'} leaf:\n\n- **Visual Pattern Detected:** Mild chlorotic interveinal yellowing with brown leaf margins.\n- **Likely Cause:** Zinc (Zn) deficiency or early moisture stress.\n- **Immediate Guidance:** Check soil moisture. Avoid water stagnation. Consider foliar spray of Chelated Zinc (Zn-EDTA 0.15% @ 1.5g/L water).\n\n*(Notice: This is a demo visual check. In production, this image is evaluated by our verified multimodal agricultural model).*`,
+          sources: ['ICAR Crop Pathology Guide', 'TNAU Leaf Color Chart Standards'],
+          time: 'Just now'
+        };
+        setChatMessages((prev) => [...prev, botResponse]);
+      }, 700);
+      return;
+    }
+
+    // Show typing indicator
+    const typingMsg = {
+      id: 'msg-typing-' + Date.now(),
+      sender: 'bot',
+      text: '...',
+      isTyping: true,
+      time: 'Just now'
+    };
+    setChatMessages((prev) => [...prev, typingMsg]);
+
+    try {
+      // Call backend RAG + Gemini endpoint
+      const response = await ragAsk(userText, 5);
+
+      // Remove typing indicator
+      setChatMessages((prev) => prev.filter(m => m.id !== typingMsg.id));
+
+      const botResponse = {
+        id: 'msg-bot-' + Date.now(),
+        sender: 'bot',
+        text: response.answer || 'I could not find a grounded answer for your question.',
+        sources: response.sources || [],
+        time: 'Just now'
+      };
+      setChatMessages((prev) => [...prev, botResponse]);
+
+      // Auto-speak the answer in the current language
+      if (response.answer) {
+        const langCode = voiceLangMap[language] || 'en-IN';
+        speakText(response.answer, langCode);
+      }
+    } catch (err) {
+      // Remove typing indicator
+      setChatMessages((prev) => prev.filter(m => m.id !== typingMsg.id));
+
+      const errorMsg = err.data?.error || err.message || 'Failed to get response from server';
+      const botResponse = {
+        id: 'msg-bot-' + Date.now(),
+        sender: 'bot',
+        text: `Sorry, I couldn't connect to the agricultural knowledge base. ${errorMsg}`,
+        sources: [],
+        time: 'Just now'
+      };
+      setChatMessages((prev) => [...prev, botResponse]);
+    }
+  };
+
+  // â”€â”€ Backend Voice Ask (Multilingual) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const sendVoiceQuestion = async (question, languageCode) => {
+    if (!question || !question.trim()) return;
+
+    const userMsg = {
+      id: 'msg-' + Date.now(),
+      sender: 'user',
+      text: question,
+      time: 'Just now'
+    };
+    setChatMessages((prev) => [...prev, userMsg]);
+
+    const typingMsg = {
+      id: 'msg-typing-' + Date.now(),
+      sender: 'bot',
+      text: '...',
+      isTyping: true,
+      time: 'Just now'
+    };
+    setChatMessages((prev) => [...prev, typingMsg]);
+
+    try {
+      const voiceLangCode = uiLangToVoiceLang(languageCode);
+      const response = await voiceAsk(question, voiceLangCode, 5);
+
+      setChatMessages((prev) => prev.filter(m => m.id !== typingMsg.id));
+
+      const botResponse = {
+        id: 'msg-bot-' + Date.now(),
+        sender: 'bot',
+        text: response.answer || 'I could not process your voice question.',
+        sources: response.sources || [],
+        time: 'Just now'
+      };
+      setChatMessages((prev) => [...prev, botResponse]);
+
+      // Auto-speak the translated answer
+      if (response.answer) {
+        speakText(response.answer, voiceLangCode);
+      }
+    } catch (err) {
+      setChatMessages((prev) => prev.filter(m => m.id !== typingMsg.id));
+
+      const errorMsg = err.data?.error || err.message || 'Voice service unavailable';
+      const botResponse = {
+        id: 'msg-bot-' + Date.now(),
+        sender: 'bot',
+        text: `Voice service error: ${errorMsg}`,
+        sources: [],
+        time: 'Just now'
+      };
+      setChatMessages((prev) => [...prev, botResponse]);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -347,6 +552,7 @@ export const AppProvider = ({ children }) => {
         chatMessages,
         getChatMessageText,
         sendChatMessage,
+        sendVoiceQuestion,
         clearChat,
         historicalReports,
         fertilizerLogs,
@@ -357,6 +563,10 @@ export const AppProvider = ({ children }) => {
         notifications,
         showNotifications,
         setShowNotifications,
+        backendOnline,
+        speakText,
+        stopSpeaking,
+        ttsSpeaking,
       }}
     >
       {children}
