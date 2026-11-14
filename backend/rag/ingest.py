@@ -436,36 +436,15 @@ def classify_document(path: Path) -> dict:
 # ── Main Ingestion Pipeline ──────────────────────────────────────────────────
 
 def run_ingestion(force: bool = False) -> dict:
-    """
-    Full ingestion pipeline using TF-IDF vectors.
+    """Build a verified versioned index and atomically activate it."""
+    import os
+    import uuid
+    import tempfile
+    import chromadb
+    from .index_state import get_active_index, activate_index
 
-    TF-IDF requires a single vectorizer fit over the whole corpus for
-    cosine similarity to be meaningful. Therefore, on any (re)indexing run
-    we extract+chunk ALL documents, re-fit the vectorizer over the full
-    chunk set, clear ChromaDB, and upsert every vector. This keeps retrieval
-    correct. When nothing has changed since the last run, we exit early so
-    duplicate indexing is avoided.
-
-    Args:
-        force: If True, re-index ALL documents regardless of hash changes.
-
-    Returns:
-        Summary dict with counts for each document state.
-    """
     documents = discover_documents()
     manifest = load_manifest()
-    import chromadb
-    _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-    # Drop and recreate so a new TF-IDF embedding dimension is accepted
-    # (ChromaDB enforces a fixed dimension per collection).
-    try:
-        _client.delete_collection(name=CHROMA_COLLECTION)
-    except Exception:
-        pass
-    collection = _client.create_collection(
-        name=CHROMA_COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
 
     summary = {
         "total_found": len(documents),
@@ -478,101 +457,154 @@ def run_ingestion(force: bool = False) -> dict:
     }
 
     if not documents:
-        log.warning("No documents found in configured directories.")
+        log.warning("No documents found. Existing index remains untouched.")
         return summary
 
-    # Compute hashes and decide what needs (re)indexing.
-    docs_to_index = []
+    hashes = {p.name: file_hash(p) for p in documents}
+    current_names = set(hashes)
+    old_names = set(manifest)
+    summary["removed_stale"] = sorted(old_names - current_names)
+
+    changed = [
+        p for p in documents
+        if force or (
+            (manifest.get(p.name, {}).get("hash")
+             if isinstance(manifest.get(p.name), dict)
+             else manifest.get(p.name)) != hashes[p.name]
+        )
+    ]
+
+    summary["skipped_unchanged"] = [
+        p.name for p in documents if p not in changed
+    ]
+
+    client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+
+    if not changed and not summary["removed_stale"]:
+        try:
+            active = get_active_index()
+            collection = client.get_collection(name=active["collection"])
+            if Path(active["vectorizer"]).is_file() and collection.count() > 0:
+                log.info("All documents unchanged. Existing index preserved.")
+                return summary
+        except Exception as exc:
+            log.warning("Existing index is unavailable; rebuilding: %s", exc)
+
+    # Always rebuild the complete corpus: TF-IDF must use one vocabulary.
+    all_chunks = []
+    pages_by_source = {}
+
     for doc_path in documents:
-        current_hash = file_hash(doc_path)
-        stored = manifest.get(doc_path.name)
-        stored_hash = stored.get("hash") if isinstance(stored, dict) else stored
-
-        if not force and stored_hash == current_hash:
-            log.info("SKIP (unchanged): %s", doc_path.name)
-            summary["skipped_unchanged"].append(doc_path.name)
-            continue
-        docs_to_index.append((doc_path, current_hash))
-
-    # Early exit: nothing changed and we already have a fitted index.
-    if not docs_to_index:
-        if vectorizer_exists() and collection.count() > 0:
-            log.info("All documents unchanged — nothing to index (duplicate prevention).")
-            return summary
-        # Manifest says changed but no vectorizer/index: fall through to full re-index.
-        docs_to_index = [(p, file_hash(p)) for p in documents]
-        summary["skipped_unchanged"] = []
-
-    # Extract + chunk ALL documents (needed so TF-IDF is fit over the full corpus).
-    all_chunks: list[dict] = []
-    for doc_path, _ in docs_to_index:
         pages = extract_document(doc_path)
         if not pages:
-            log.warning("No text extracted from %s — skipping.", doc_path.name)
             summary["skipped_unreadable"].append(doc_path.name)
             continue
+
         chunks = build_chunks(doc_path, pages)
         if not chunks:
-            log.warning("No chunks produced for %s — skipping.", doc_path.name)
             summary["skipped_unreadable"].append(doc_path.name)
             continue
+
+        pages_by_source[doc_path.name] = len(pages)
         all_chunks.extend(chunks)
 
-    if not all_chunks:
+    # Never activate a partial index if any source failed extraction.
+    if summary["skipped_unreadable"]:
+        log.error("Index build aborted: unreadable documents detected. Old index preserved.")
         return summary
 
-    # Select a balanced, ag-prioritized subset across all documents
-    # instead of blindly taking the first 500 chunks (which were all FAO front matter).
+    if not all_chunks:
+        log.error("No chunks extracted. Old index preserved.")
+        return summary
+
     selected_chunks = select_balanced_chunks(all_chunks, target_total=800)
     if not selected_chunks:
-        log.warning("No usable chunks selected — nothing to index.")
+        log.error("No usable chunks selected. Old index preserved.")
         return summary
 
-    # Fit TF-IDF on the selected subset so embeddings stay consistent.
-    texts = [c["text"] for c in selected_chunks]
-    indexed_sources = {c["source"] for c in selected_chunks}
-    log.info("Fitting TF-IDF vectorizer on %d selected chunk(s) from %d document(s)...",
-             len(texts), len(indexed_sources))
-    vectorizer = get_vectorizer(texts=texts, fit=True)
-    embeddings = embed_texts(texts)
+    texts = [chunk["text"] for chunk in selected_chunks]
+    vectorizer = TfidfVectorizer()
+    vectorizer.fit(texts)
+    embeddings = vectorizer.transform(texts).toarray().tolist()
 
-    # Clear and re-upsert so the index is consistent with the new vectorizer.
-    clear_collection(collection)
+    # Stage everything under a unique version; never modify the active index.
+    version = uuid.uuid4().hex
+    collection_name = f"{CHROMA_COLLECTION}_{version}"
+    index_dir = Path(CHROMA_DB_PATH) / "indexes"
+    index_dir.mkdir(parents=True, exist_ok=True)
+    vectorizer_path = index_dir / f"{version}_tfidf.pkl"
+
+    collection = client.create_collection(
+        name=collection_name,
+        metadata={"hnsw:space": "cosine"},
+    )
+
     upsert_chunks(collection, selected_chunks, embeddings)
 
-    # Rebuild manifest; record chunks actually indexed per document.
-    indexed_per_source: dict[str, int] = {}
-    for c in selected_chunks:
-        indexed_per_source[c["source"]] = indexed_per_source.get(c["source"], 0) + 1
+    if collection.count() != len(selected_chunks):
+        raise RuntimeError("Staged collection count verification failed.")
 
-    new_manifest: dict = {}
-    total_chunks = 0
+    # Persist the matching vectorizer atomically.
+    fd, temp_name = tempfile.mkstemp(
+        prefix="vectorizer_", suffix=".tmp", dir=str(index_dir)
+    )
+    try:
+        with os.fdopen(fd, "wb") as file:
+            pickle.dump(vectorizer, file)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_name, vectorizer_path)
+    except Exception:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+        raise
+
+    # Verify the persisted vectorizer before switching the active pointer.
+    with vectorizer_path.open("rb") as file:
+        verified_vectorizer = pickle.load(file)
+
+    if verified_vectorizer.transform([texts[0]]).shape[1] != len(embeddings[0]):
+        raise RuntimeError("Vectorizer dimension verification failed.")
+
+    # This is the only operation that changes what retrieval uses.
+    activate_index(
+        collection=collection_name,
+        vectorizer_path=str(vectorizer_path),
+        version=version,
+    )
+
+    indexed_per_source = {}
+    for chunk in selected_chunks:
+        name = chunk["source"]
+        indexed_per_source[name] = indexed_per_source.get(name, 0) + 1
+
+    new_manifest = {}
     for doc_path in documents:
-        pages = extract_document(doc_path)
         new_manifest[doc_path.name] = {
-            "hash": file_hash(doc_path),
+            "hash": hashes[doc_path.name],
             "chunks": indexed_per_source.get(doc_path.name, 0),
-            "pages": len(pages),
+            "pages": pages_by_source[doc_path.name],
         }
-        total_chunks += indexed_per_source.get(doc_path.name, 0)
 
+        if doc_path in changed:
+            entry = {
+                "file": doc_path.name,
+                "chunks": indexed_per_source.get(doc_path.name, 0),
+            }
+            if doc_path.name in manifest:
+                summary["indexed_updated"].append(entry)
+            else:
+                summary["indexed_new"].append(entry)
+
+    # Manifest update happens after activation; failure here cannot damage retrieval.
     save_manifest(new_manifest)
 
-    summary["total_chunks_added"] = total_chunks
-    for doc_path in documents:
-        entry = new_manifest[doc_path.name]
-        if doc_path.name in summary["skipped_unchanged"]:
-            continue
-        summary["indexed_new"].append({"file": doc_path.name, "chunks": entry["chunks"]})
-
+    summary["total_chunks_added"] = len(selected_chunks)
     log.info(
-        "  ✓ Indexed %d document(s), %d chunk(s) total.",
-        len(documents), total_chunks,
+        "Activated index %s with %d verified chunks.",
+        version, len(selected_chunks),
     )
     return summary
-
-
-# ── Entry Point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     force_flag = "--force" in sys.argv

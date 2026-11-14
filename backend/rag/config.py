@@ -41,5 +41,5 @@ CHUNK_OVERLAP = 100    # overlap characters between consecutive chunks
 DEFAULT_TOP_K = 5
 
 # ── Manifest file (tracks doc hashes to avoid re-indexing) ──────────────────
-MANIFEST_PATH = BACKEND_DIR / "chroma_db" / "manifest.json"
+MANIFEST_PATH = Path(CHROMA_DB_PATH) / "manifest.json"
 

@@ -6,31 +6,27 @@ searches ChromaDB, returns ranked passages.
 import logging
 from typing import Optional
 
-from .config import (
-    CHROMA_DB_PATH,
-    CHROMA_COLLECTION,
-    DEFAULT_TOP_K,
-)
+from .config import CHROMA_DB_PATH, DEFAULT_TOP_K
+from .index_state import get_active_index
 
 log = logging.getLogger("agriwise.retrieve")
 
 
-def _get_collection():
-    """Return the ChromaDB collection (read-only)."""
+def _get_collection(index=None):
+    """Return the collection belonging to the selected index."""
     import chromadb
+    index = index or get_active_index()
     client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-    collection = client.get_or_create_collection(
-        name=CHROMA_COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
-    return collection
+    return client.get_collection(name=index["collection"])
 
 
-def _embed_query(query: str) -> list[float]:
-    """Transform the query string using the persisted TF-IDF vectorizer."""
-    from .ingest import embed_texts
-    vectors = embed_texts([query])
-    return vectors[0]
+def _embed_query(query: str, index=None) -> list[float]:
+    """Transform the query using the vectorizer paired with the selected index."""
+    import pickle
+    index = index or get_active_index()
+    with open(index["vectorizer"], "rb") as file:
+        vectorizer = pickle.load(file)
+    return vectorizer.transform([query]).toarray()[0].tolist()
 
 
 def retrieve(query: str, top_k: int = DEFAULT_TOP_K) -> list[dict]:
@@ -57,7 +53,8 @@ def retrieve(query: str, top_k: int = DEFAULT_TOP_K) -> list[dict]:
         return []
 
     try:
-        collection = _get_collection()
+        index = get_active_index()
+        collection = _get_collection(index)
     except Exception as exc:
         log.error("Could not connect to ChromaDB: %s", exc)
         return []
@@ -76,7 +73,7 @@ def retrieve(query: str, top_k: int = DEFAULT_TOP_K) -> list[dict]:
 
     # Embed the query
     try:
-        query_embedding = _embed_query(query)
+        query_embedding = _embed_query(query, index)
     except Exception as exc:
         log.error("Failed to embed query: %s", exc)
         return []
