@@ -1,54 +1,89 @@
+
+
 """
 AGRIWISE RAG Pipeline — Answer Generation (Gemini)
 Generates an answer grounded strictly in retrieved passages.
 Never invents agricultural advice, citations, or API results.
 """
+
 import logging
 import os
+import requests
+from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from .config import BACKEND_DIR
+
+# Load environment variables from backend/.env
+load_dotenv(BACKEND_DIR / ".env")
 
 log = logging.getLogger("agriwise.generate")
 
 # Default model; overridable via GEMINI_MODEL env var.
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
-# Ordered fallbacks tried when the configured model is unavailable to the key.
-FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-1.5-flash", "gemini-2.0-flash"]
+# Active fallback model.
+FALLBACK_MODELS = [
+    "gemini-3.8-flash",
+]
 
-# Phrases that indicate the model could not ground an answer in the passages.
+# Phrases indicating that the generated answer lacks sufficient evidence.
 INSUFFICIENT_SIGNALS = [
-    "cannot answer", "can't answer", "unable to answer",
-    "no information", "not enough information", "insufficient",
-    "do not have enough", "does not contain", "not covered",
-    "no relevant", "no mention", "not addressed",
+    "specific instructions on how",
+    "not mentioned",
+    "not detailed",
+    "only state that",
+    "cannot answer",
+    "can't answer",
+    "unable to answer",
+    "cannot provide",
+    "no information",
+    "not enough information",
+    "not enough evidence",
+    "insufficient",
+    "do not have enough",
+    "does not contain",
+    "not covered",
+    "no relevant",
+    "no mention",
+    "not addressed",
+    "no specific instructions",
+    "no specific guidance",
+    "no details",
+    "does not explain",
+    "do not explain",
+    "not explained",
+    "not specified",
+    "not described",
+    "cannot be determined",
 ]
 
 
 def _answer_indicates_insufficient(answer: str) -> bool:
     low = (answer or "").lower()
-    return any(sig in low for sig in INSUFFICIENT_SIGNALS)
+    return any(signal in low for signal in INSUFFICIENT_SIGNALS)
 
 
 def _load_api_key() -> Optional[str]:
-    """Read GEMINI_API_KEY from the environment (loaded from backend/.env)."""
-    key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not key or key == "your_gemini_api_key_here":
-        return None
-    return key
+    """Read the OpenRouter API key."""
+    return os.getenv("OPENROUTER_API_KEY", "").strip() or None
 
 
 def _build_prompt(question: str, passages: list[dict]) -> str:
-    """Build a grounding prompt that cites only the provided passages."""
+    """Build a grounding prompt that cites only provided passages."""
     numbered = []
+
     for idx, p in enumerate(passages, start=1):
         page = p.get("page")
         page_str = str(page) if page is not None else "n/a"
         source = p.get("source") or "unknown"
+
         numbered.append(
-            f"[{idx}] {p.get('text', '')}\n     (Source: {source}, page {page_str})"
+            f"[{idx}] {p.get('text', '')}\n"
+            f"     (Source: {source}, page {page_str})"
         )
+
     passages_block = "\n\n".join(numbered)
 
     return (
@@ -69,32 +104,22 @@ def _build_prompt(question: str, passages: list[dict]) -> str:
 
 
 def generate_answer(question: str, passages: list[dict]) -> dict:
-    """
-    Generate a grounded answer using Gemini.
+    """Generate a grounded answer using OpenRouter."""
 
-    Returns a dict with:
-      - answer: str — the generated answer (or an explanatory message).
-      - model: str | None — the model used, or None if generation was skipped.
-      - evidence_sufficient: bool — whether passages were available to ground the answer.
-      - error: str | None — a human-readable error if generation could not run.
-    """
-    api_key = _load_api_key()
-    if api_key is None:
+    if not _load_api_key():
         return {
             "answer": None,
             "model": None,
-            "evidence_sufficient": bool(passages),
-            "error": (
-                "GEMINI_API_KEY is not configured in backend/.env. "
-                "Set a real Google Generative AI API key to enable answer generation."
-            ),
+            "evidence_sufficient": False,
+            "error": "OPENROUTER_API_KEY is not configured in backend/.env.",
         }
 
     if not passages:
         return {
             "answer": (
-                "The available knowledge base does not contain any relevant passages "
-                "for this question, so I cannot provide a grounded agricultural answer."
+                "The available knowledge base does not contain any relevant "
+                "passages for this question, so I cannot provide a grounded "
+                "agricultural answer."
             ),
             "model": None,
             "evidence_sufficient": False,
@@ -102,43 +127,43 @@ def generate_answer(question: str, passages: list[dict]) -> dict:
         }
 
     try:
-        from google import genai
-    except ImportError as exc:
-        log.error("google-genai SDK not installed: %s", exc)
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {_load_api_key()}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "openrouter/free",
+                "messages": [{
+                    "role": "user",
+                    "content": _build_prompt(question, passages)
+                }],
+                "temperature": 0.2,
+                "max_tokens": 1200,
+            },
+            timeout=90,
+        )
+        response.raise_for_status()
+        data = response.json()
+        answer = data["choices"][0]["message"]["content"]
+
+        if not answer or not answer.strip():
+            raise RuntimeError("OpenRouter returned an empty answer.")
+
+        answer = answer.strip()
+        return {
+            "answer": answer,
+            "model": data.get("model", "openrouter/free"),
+            "evidence_sufficient": not _answer_indicates_insufficient(answer),
+            "error": None,
+        }
+
+    except Exception as exc:
+        log.exception("OpenRouter generation failed")
         return {
             "answer": None,
             "model": None,
-            "evidence_sufficient": True,
-            "error": "google-genai SDK is not installed.",
+            "evidence_sufficient": False,
+            "error": f"OpenRouter generation failed: {exc}",
         }
-
-    prompt = _build_prompt(question, passages)
-
-    # Try the configured model, then fallbacks, so the endpoint works with whatever
-    # model the configured API key has access to.
-    last_error = None
-    models_to_try = [DEFAULT_MODEL] + [m for m in FALLBACK_MODELS if m != DEFAULT_MODEL]
-    for model in models_to_try:
-        try:
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(model=model, contents=prompt)
-            answer = getattr(response, "text", None) or ""
-            if not answer.strip():
-                answer = "The model returned an empty answer."
-            return {
-                "answer": answer.strip(),
-                "model": model,
-                "evidence_sufficient": not _answer_indicates_insufficient(answer),
-                "error": None,
-            }
-        except Exception as exc:
-            last_error = exc
-            log.warning("Gemini model %s failed: %s", model, exc)
-            continue
-
-    return {
-        "answer": None,
-        "model": None,
-        "evidence_sufficient": True,
-        "error": f"Gemini generation failed for all attempted models: {last_error}",
-    }

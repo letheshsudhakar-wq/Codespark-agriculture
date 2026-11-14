@@ -11,11 +11,18 @@ export const FarmInfoScreen = () => {
   const [subStep, setSubStep] = useState(1);
   const totalSubSteps = 4;
 
+  // Preserve existing custom crop and soil information
+  const existingCrop = farmInfo.crop || 'paddy';
+  const isExistingCrop = CROPS.some(c => c.id === existingCrop);
+
   // Local form state
   const [formData, setFormData] = useState({
     farmerName: farmInfo.farmerName || '',
     location: farmInfo.location || '',
-    crop: farmInfo.crop || 'paddy',
+    crop: isExistingCrop ? existingCrop : 'other',
+    customCrop: isExistingCrop ? '' : existingCrop,
+    soilType: farmInfo.soilType || '',
+    customSoilType: '',
     farmArea: farmInfo.farmArea || '2.5',
     sowingDate: farmInfo.sowingDate || '2026-10-12',
     growthStage: farmInfo.growthStage || 'vegetative',
@@ -44,8 +51,34 @@ export const FarmInfoScreen = () => {
       setSubStep(subStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // Save full farm info
-      updateFarmInfo(formData);
+      // Validate custom crop and soil entries
+      if (formData.crop === 'other' && !formData.customCrop.trim()) {
+        alert('Please enter your crop name.');
+        setSubStep(2);
+        return;
+      }
+
+      if (formData.soilType === 'other' && !formData.customSoilType.trim()) {
+        alert('Please enter your soil type.');
+        setSubStep(2);
+        return;
+      }
+
+      // Save actual values, not temporary form fields
+      const dataToSave = {
+        ...formData,
+        crop: formData.crop === 'other'
+          ? formData.customCrop.trim().toLowerCase()
+          : formData.crop,
+        soilType: formData.soilType === 'other'
+          ? formData.customSoilType.trim()
+          : formData.soilType,
+      };
+
+      delete dataToSave.customCrop;
+      delete dataToSave.customSoilType;
+
+      updateFarmInfo(dataToSave);
 
       // Decision logic:
       // If no verified soil report, go to Screen 5 (Preliminary Soil Assessment)
@@ -183,8 +216,66 @@ export const FarmInfoScreen = () => {
                     </div>
                   );
                 })}
+
+                <div
+                  onClick={() => handleChange('crop', 'other')}
+                  className={`selectable-card ${formData.crop === 'other' ? 'active' : ''}`}
+                  style={{ padding: '12px 8px', cursor: 'pointer' }}
+                >
+                  <span style={{ fontSize: '24px' }}>🌱</span>
+                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)' }}>
+                    Other Crop
+                  </span>
+                </div>
               </div>
             </div>
+
+            {formData.crop === 'other' && (
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label className="form-label">Enter Crop Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Sunflower, Ragi, Jowar"
+                  value={formData.customCrop}
+                  onChange={e => handleChange('customCrop', e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label className="form-label">Select Soil Type</label>
+              <select
+                className="form-select"
+                value={formData.soilType}
+                onChange={e => handleChange('soilType', e.target.value)}
+              >
+                <option value="">Select soil type</option>
+                <option value="sandy">Sandy Soil</option>
+                <option value="clayey">Clayey Soil</option>
+                <option value="loamy">Loamy Soil</option>
+                <option value="silty">Silty Soil</option>
+                <option value="black">Black Soil (Regur)</option>
+                <option value="red">Red Soil</option>
+                <option value="laterite">Laterite Soil</option>
+                <option value="alluvial">Alluvial Soil</option>
+                <option value="other">Other</option>
+                <option value="unknown">I Don't Know</option>
+              </select>
+            </div>
+
+            {formData.soilType === 'other' && (
+              <div className="form-group" style={{ marginTop: '10px' }}>
+                <label className="form-label">Enter Soil Type *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Describe your soil"
+                  value={formData.customSoilType}
+                  onChange={e => handleChange('customSoilType', e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="grid-2" style={{ marginTop: '12px' }}>
               <div className="form-group">
@@ -378,3 +469,4 @@ export const FarmInfoScreen = () => {
     </div>
   );
 };
+

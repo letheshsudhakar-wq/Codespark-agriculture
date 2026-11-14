@@ -185,12 +185,12 @@ export const ChatbotScreen = () => {
     <div className="screen-container" style={{ paddingBottom: '170px' }}>
       <Header showBack={true} title={t.chatbot?.title || 'AGRIWISE AI Assistant'} />
 
-      {/* Demo Mode & Pre-calibrated notice */}
+      {/* AI Assistant status bar */}
       <div style={{ backgroundColor: '#FAFDF6', padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
           <span style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--dark-green)' }}>
-            {t.chatbot?.demoBadge || 'Demo Mode • Agronomic Knowledge Base'}
+            AGRIWISE AI • Agricultural Knowledge Assistant
           </span>
         </div>
         <button 
